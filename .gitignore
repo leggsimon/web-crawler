@@ -1,0 +1,12 @@
+# Backend
+backend/bin/
+
+# Environment
+.env
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+.notes/
