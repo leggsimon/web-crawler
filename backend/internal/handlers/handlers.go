@@ -44,51 +44,85 @@ func URLs(db *sql.DB) http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
+		switch r.Method {
+		case http.MethodGet:
+			urls, err := db.Query("SELECT id, url FROM urls")
+			if err != nil {
+				log.Printf("failed to get urls: %v", err)
+				//TODO: refactor common response hanlders
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("failed to get urls"))
+				return
+			}
+			defer urls.Close()
+
+			var resp []ResponseBody
+			for urls.Next() {
+				var url ResponseBody
+				if err := urls.Scan(&url.ID, &url.URL); err != nil {
+					log.Printf("failed to scan url: %v", err)
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Write([]byte("failed to scan url"))
+					return
+				}
+				resp = append(resp, url)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			if err := json.NewEncoder(w).Encode(resp); err != nil {
+				log.Printf("failed to encode response: %v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("unexpected error occurred"))
+				return
+			}
+		case http.MethodPost:
+			defer r.Body.Close()
+
+			var body RequestBody
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte("request body must be valid JSON"))
+				return
+			}
+			if body.URL == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte("url is required"))
+				return
+			}
+
+			log.Printf("inserting url: %s", body.URL)
+			result, err := db.Exec("INSERT INTO urls (url) VALUES (?)", body.URL)
+			if err != nil {
+				log.Printf("failed to insert url: %v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("failed to insert url"))
+				return
+			}
+
+			id, err := result.LastInsertId()
+			if err != nil {
+				log.Printf("failed to get inserted id: %v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("failed to insert url"))
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+
+			resp := ResponseBody{
+				ID:  id,
+				URL: body.URL,
+			}
+			if err := json.NewEncoder(w).Encode(resp); err != nil {
+				log.Printf("failed to encode response: %v", err)
+			}
+		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Write([]byte("method not allowed"))
 			return
 		}
 
-		defer r.Body.Close()
-
-		var body RequestBody
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("request body must be valid JSON"))
-			return
-		}
-		if body.URL == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("url is required"))
-			return
-		}
-
-		log.Printf("inserting url: %s", body.URL)
-		result, err := db.Exec("INSERT INTO urls (url) VALUES (?)", body.URL)
-		if err != nil {
-			log.Printf("failed to insert url: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("failed to insert url"))
-			return
-		}
-
-		id, err := result.LastInsertId()
-		if err != nil {
-			log.Printf("failed to get inserted id: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("failed to insert url"))
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-
-		resp := ResponseBody{
-			ID:  id,
-			URL: body.URL,
-		}
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			log.Printf("failed to encode response: %v", err)
-		}
 	}
 }
