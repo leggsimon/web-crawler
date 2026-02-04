@@ -35,18 +35,31 @@ func Ready(db *sql.DB) http.HandlerFunc {
 }
 
 func URLs(db *sql.DB) http.HandlerFunc {
-	type RequestBody struct {
+	type PostRequest struct {
 		URL string `json:"url"`
 	}
-	type ResponseBody struct {
+	type PostResponse struct {
 		ID  int64  `json:"id"`
 		URL string `json:"url"`
+	}
+	type GetResponse struct {
+		ID     int64  `json:"id"`
+		URL    string `json:"url"`
+		Status string `json:"status"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			urls, err := db.Query("SELECT id, url FROM urls")
+			query := `
+				SELECT 
+					u.id,
+					u.url,
+					cs.status
+				FROM urls u
+				LEFT JOIN crawl_statuses cs ON u.id = cs.url_id
+				ORDER BY u.created_at DESC;`
+			urls, err := db.Query(query)
 			if err != nil {
 				log.Printf("failed to get urls: %v", err)
 				//TODO: refactor common response hanlders
@@ -56,16 +69,16 @@ func URLs(db *sql.DB) http.HandlerFunc {
 			}
 			defer urls.Close()
 
-			var resp []ResponseBody
+			var resp []GetResponse
 			for urls.Next() {
-				var url ResponseBody
-				if err := urls.Scan(&url.ID, &url.URL); err != nil {
+				var row GetResponse
+				if err := urls.Scan(&row.ID, &row.URL, &row.Status); err != nil {
 					log.Printf("failed to scan url: %v", err)
 					w.WriteHeader(http.StatusInternalServerError)
 					w.Write([]byte("failed to scan url"))
 					return
 				}
-				resp = append(resp, url)
+				resp = append(resp, row)
 			}
 
 			w.Header().Set("Content-Type", "application/json")
@@ -79,7 +92,7 @@ func URLs(db *sql.DB) http.HandlerFunc {
 		case http.MethodPost:
 			defer r.Body.Close()
 
-			var body RequestBody
+			var body PostRequest
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 				w.Write([]byte("request body must be valid JSON"))
@@ -108,10 +121,20 @@ func URLs(db *sql.DB) http.HandlerFunc {
 				return
 			}
 
+			_, err = db.Exec("INSERT INTO crawl_statuses (url_id, status) VALUES (?, 'queued')", id)
+			if err != nil {
+				log.Printf("failed to insert crawl_status: %v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("failed to insert crawl_status"))
+				return
+			}
+
+			// TODO: Trigger processing of the url which will set the crawl_status to 'running' and start the crawl
+
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
 
-			resp := ResponseBody{
+			resp := PostResponse{
 				ID:  id,
 				URL: body.URL,
 			}
