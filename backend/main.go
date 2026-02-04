@@ -52,6 +52,8 @@ func main() {
 	mux.HandleFunc("/health", handlers.Health)
 	mux.Handle("/ready", handlers.Ready(db))
 
+	mux.HandleFunc("/urls", handlers.URLs(db))
+
 	log.Printf("listening on :%s", port)
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Fatalf("server: %v", err)
