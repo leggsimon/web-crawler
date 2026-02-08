@@ -8,17 +8,12 @@ import (
 	"strings"
 )
 
-type CrawlResult struct {
-	Status int
-	Html   string
-}
-
-func CrawlUrl(url string) (CrawlResult, error) {
+func FetchHTML(url string) (string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		// handle error
 		log.Printf("failed to get url %s: %v", url, err)
-		return CrawlResult{}, fmt.Errorf("failed to get url %s: %w", url, err)
+		return "", fmt.Errorf("failed to get url %s: %w", url, err)
 	}
 	defer resp.Body.Close()
 
@@ -27,23 +22,25 @@ func CrawlUrl(url string) (CrawlResult, error) {
 	if !strings.Contains(contentType, "text/html") {
 		err := fmt.Errorf("server returned a non html Content-Type header, got: %s", contentType)
 		log.Printf("%v", err)
-		return CrawlResult{Status: resp.StatusCode}, err
+		return "", err
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("failed to read response body for url %s: %v", url, err)
-		return CrawlResult{}, fmt.Errorf("failed to read response body for url %s: %w", url, err)
+		return "", fmt.Errorf("failed to read response body for url %s: %w", url, err)
 	}
+
+	return string(body), nil
+}
+
+func CrawlUrl(url string) {
 	// make a request for url
+	// html, err := FetchHTML(url)
 
 	// parse the html
 
 	// store each link
 
 	// for each link make a request and store the status code.
-	return CrawlResult{
-		Status: resp.StatusCode,
-		Html:   string(body),
-	}, nil
 }

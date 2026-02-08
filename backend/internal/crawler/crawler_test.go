@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestCrawlUrl_Success(t *testing.T) {
+func TestFetchHTML_Success(t *testing.T) {
 	html := "<html><body><a href='/page1'>Link</a></body></html>"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -16,20 +16,17 @@ func TestCrawlUrl_Success(t *testing.T) {
 	defer server.Close()
 
 	// Test the crawler with the test server URL
-	result, err := CrawlUrl(server.URL)
+	result, err := FetchHTML(server.URL)
 	if err != nil {
 		t.Errorf("expected no error for successful crawl, got: %v", err)
 	}
 
-	if result.Status != http.StatusOK {
-		t.Errorf("expected status %d, got %d", http.StatusOK, result.Status)
-	}
-	if result.Html != html {
-		t.Errorf("expected HTML content %s, got %s", html, result.Html)
+	if result != html {
+		t.Errorf("expected HTML content %s, got %s", html, result)
 	}
 }
 
-func TestCrawlUrl_NonSuccessWithHtml(t *testing.T) {
+func TestFetchHTML_NonSuccessWithHtml(t *testing.T) {
 	html := "<html><body><h1>Not Found</h1></body></html>"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
@@ -39,29 +36,26 @@ func TestCrawlUrl_NonSuccessWithHtml(t *testing.T) {
 	defer server.Close()
 
 	// Test the crawler with the test server URL
-	result, err := CrawlUrl(server.URL)
+	result, err := FetchHTML(server.URL)
 
 	if err != nil {
 		t.Errorf("expected no error for successful crawl, got: %v", err)
 	}
 
-	if result.Status != http.StatusNotFound {
-		t.Errorf("expected status %d, got %d", http.StatusNotFound, result.Status)
-	}
-	if result.Html != html {
-		t.Errorf("expected HTML content %s, got %s", html, result.Html)
+	if result != html {
+		t.Errorf("expected HTML content %s, got %s", html, result)
 	}
 }
 
-func TestCrawlUrl_ServerErrorNoContentTYpeHeader(t *testing.T) {
+func TestFetchHTML_NoContentTYpeHeader(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal Server Error"))
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Ok"))
 	}))
 	defer server.Close()
 
 	// Test the crawler with the test server URL
-	result, err := CrawlUrl(server.URL)
+	result, err := FetchHTML(server.URL)
 	if err == nil {
 		t.Error("expected error for server error status, got nil")
 	}
@@ -70,14 +64,14 @@ func TestCrawlUrl_ServerErrorNoContentTYpeHeader(t *testing.T) {
 	if err != nil && msg != wantedMsg {
 		t.Errorf("expected correct error message '%s', got: %s", wantedMsg, msg)
 	}
-	if result.Status != http.StatusInternalServerError {
-		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, result.Status)
+	if result != "" {
+		t.Errorf("expected empty result on error, got html %s", result)
 	}
 }
 
-func TestCrawlUrl_InvalidURL(t *testing.T) {
+func TestFetchHTML_InvalidURL(t *testing.T) {
 	// Test with an invalid URL
-	result, err := CrawlUrl("http://invalid-url-that-does-not-exist.local")
+	result, err := FetchHTML("http://invalid-url-that-does-not-exist.local")
 	if err == nil {
 		t.Error("expected error for invalid URL, got nil")
 	}
@@ -86,7 +80,7 @@ func TestCrawlUrl_InvalidURL(t *testing.T) {
 	if err != nil && msg != wantedMsg {
 		t.Errorf("expected correct error message '%s', got: %s", wantedMsg, msg)
 	}
-	if result.Status != 0 {
-		t.Errorf("expected empty result on error, got status %d", result.Status)
+	if result != "" {
+		t.Errorf("expected empty result on error, got html %s", result)
 	}
 }
