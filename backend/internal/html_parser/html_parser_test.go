@@ -46,6 +46,26 @@ func TestParseHTML_ReturnsHeaderTagsCount(t *testing.T) {
 	}
 }
 
+func TestParseHTML_ReturnsPageTitle(t *testing.T) {
+	html := `
+	<!DOCTYPE html>
+		<head>
+			<title>Page Title</title>
+		<body>
+			<h1>FirstHeading</h1>
+		</body>
+	</html>`
+
+	result, err := ParseHTML(html)
+	if err != nil {
+		t.Errorf("expected no error for parse, got: %v", err)
+	}
+
+	if result.Title != "Page Title" {
+		t.Errorf("expected html version to be 'Page Title', got %s", result.Title)
+	}
+}
+
 func TestParseHTML_ReturnsHTML5Version(t *testing.T) {
 	html := `
 	<!DOCTYPE html>

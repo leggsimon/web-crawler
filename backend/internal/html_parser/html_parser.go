@@ -10,6 +10,7 @@ import (
 
 type ParseHTMLResult struct {
 	HTMLVersion string
+	Title       string
 	H1TagsCount int
 	H2TagsCount int
 	H3TagsCount int
@@ -31,6 +32,8 @@ func ParseHTML(htmlContent string) (ParseHTMLResult, error) {
 
 		if n.Type == html.ElementNode {
 			switch n.DataAtom {
+			case atom.Title:
+				result.Title = n.FirstChild.Data
 			case atom.H1:
 				result.H1TagsCount++
 			case atom.H2:
