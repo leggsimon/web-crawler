@@ -9,6 +9,7 @@ import (
 )
 
 type ParseHTMLResult struct {
+	HTMLVersion string
 	H1TagsCount int
 	H2TagsCount int
 	H3TagsCount int
@@ -24,6 +25,10 @@ func ParseHTML(htmlContent string) (ParseHTMLResult, error) {
 	}
 	result := ParseHTMLResult{}
 	for n := range doc.Descendants() {
+		if n.Type == html.DoctypeNode {
+			result.HTMLVersion = extractHTMLVersion(n)
+		}
+
 		if n.Type == html.ElementNode {
 			switch n.DataAtom {
 			case atom.H1:
@@ -42,4 +47,25 @@ func ParseHTML(htmlContent string) (ParseHTMLResult, error) {
 		}
 	}
 	return result, nil
+}
+
+func extractHTMLVersion(n *html.Node) string {
+	if strings.ToLower(n.Data) == "html" {
+		if n.Attr == nil {
+			return "5"
+		}
+
+		for _, a := range n.Attr {
+			val := strings.ToLower(a.Val)
+
+			// TODO: Theres definitely a more comprehensive way to get all but for now this will do.
+			switch {
+			case strings.Contains(val, "html 4.01"):
+				return "4.01"
+			case strings.Contains(val, "html 4.00"):
+				return "4.00"
+			}
+		}
+	}
+	return "Unknown"
 }
